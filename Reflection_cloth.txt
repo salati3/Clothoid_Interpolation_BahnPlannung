@@ -14,13 +14,13 @@ def calculate_basic_clothoid(s_length):
 
     return clothoid_points
 
-def reflect_point_across_normal(point, merging_point):
+def reflect_point_across_normal(point, merging_point,tangent_angle):
     x, y = point
     x_merge, y_merge = merging_point
-    bias = -0.8
-    tangent_angle = bias + math.atan2( y_merge, -x_merge)
-    normal_x = math.sin(tangent_angle)
-    normal_y = math.cos(tangent_angle)
+    bias = -0.75
+    #tangent_angle = bias + math.atan2( y_merge, -x_merge)
+    normal_x = math.cos( math.pi/2 +tangent_angle)
+    normal_y = math.sin( math.pi/2 +tangent_angle)
 
     dx = x - x_merge
     dy = y - y_merge
@@ -41,8 +41,13 @@ def reflect_point_across_normal(point, merging_point):
 
 def symmetric_clothoid(first_clothoid_points):
     merging_point = first_clothoid_points[-1]
+    before_merg = first_clothoid_points[-2]
+    pseudo_tangent_x = merging_point[0]-before_merg[0]
+    pseudo_tangent_y = merging_point[1]-before_merg[1]
+    pseudo_tangent_vec = [pseudo_tangent_x, pseudo_tangent_y]
+    tangent_angle = math.atan2(pseudo_tangent_y,pseudo_tangent_x)
 
-    symmetric_clothoid_points = [reflect_point_across_normal(point, merging_point)
+    symmetric_clothoid_points = [reflect_point_across_normal(point, merging_point,tangent_angle)
                                  for point in reversed(first_clothoid_points)]
 
     merged_clothoid_points = symmetric_clothoid_points
@@ -51,6 +56,8 @@ def symmetric_clothoid(first_clothoid_points):
 
 # Define the length of the clothoid
 s_length = 1
+
+#tangent_angle = s_length*s_length*0.5
 
 # Calculate the basic and symmetric clothoid points
 basic_clothoid_points = calculate_basic_clothoid(s_length)
