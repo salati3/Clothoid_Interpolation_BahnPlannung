@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 def calculate_basic_clothoid(s_length):
     clothoid_points = []
-    dt = 0.1  # Step size for numerical integration
+    dt = 0.01  # Step size for numerical integration
     t = 0.0
 
     while t <= s_length:
@@ -41,7 +41,7 @@ def reflect_point_across_normal(point, merging_point,tangent_angle):
 
 def symmetric_clothoid(first_clothoid_points):
     clothoid_points = []
-    scale = 0.5
+    scale = 1.2
     for point in first_clothoid_points:
       point_x = point[0] *scale
       point_y = point[1]*scale
@@ -49,8 +49,8 @@ def symmetric_clothoid(first_clothoid_points):
     
     merging_point = clothoid_points[-1]
     before_merg = clothoid_points[-2]
-    pseudo_tangent_x = merging_point[0]-before_merg[0]
-    pseudo_tangent_y = merging_point[1]-before_merg[1]
+    pseudo_tangent_x = before_merg[0] -merging_point[0]
+    pseudo_tangent_y = before_merg[1] -merging_point[1]
     pseudo_tangent_vec = [pseudo_tangent_x, pseudo_tangent_y]
     tangent_angle = math.atan2(pseudo_tangent_y,pseudo_tangent_x)
 
@@ -61,8 +61,19 @@ def symmetric_clothoid(first_clothoid_points):
 
     return merged_clothoid_points
 
+def Clockwise_Merged_Clothoid(merged_clothoid_points):
+  clockwise_merged_clothoid = []
+  for point in merged_clothoid_points:
+    point_x = point[0] 
+    point_y = -point[1] 
+    clockwise_merged_clothoid.append((point_x,point_y))
+  
+  return clockwise_merged_clothoid
+  
+
+
 # Define the length of the clothoid
-s_length = 0.9
+s_length = 1
 
 
 
@@ -71,14 +82,17 @@ basic_clothoid_points = calculate_basic_clothoid(s_length)
 
 symmetric_clothoid_points = symmetric_clothoid(basic_clothoid_points)
 
+clockwise_merged_clothoid =  Clockwise_Merged_Clothoid(symmetric_clothoid_points)
+
 # Extract x and y coordinates for plotting
 basic_clothoid_x, basic_clothoid_y = zip(*basic_clothoid_points)
 symmetric_clothoid_x, symmetric_clothoid_y = zip(*symmetric_clothoid_points)
-
+clockwise_merged_clothoid_x, clockwise_merged_clothoid_y = zip(*clockwise_merged_clothoid)
 # Plot the clothoids
 plt.figure(figsize=(8, 6))
 plt.plot(basic_clothoid_x, basic_clothoid_y, label="Basic Clothoid")
 plt.plot(symmetric_clothoid_x, symmetric_clothoid_y, label="Symmetric Clothoid")
+plt.plot(clockwise_merged_clothoid_x, clockwise_merged_clothoid_y, label="Anticlockwise Merged Clothoid")
 plt.xlabel("x")
 plt.ylabel("y")
 plt.title("Clothoid and Symmetric Clothoid")
