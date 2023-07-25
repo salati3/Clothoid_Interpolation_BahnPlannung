@@ -3,16 +3,28 @@ import matplotlib.pyplot as plt
 
 def calculate_basic_clothoid(s_length):
     clothoid_points = []
-    dt = 0.01  # Step size for numerical integration
+    dt = 0.1  # Step size for numerical integration
     t = 0.0
-
-    while t <= s_length:
-        x = t * math.cos(t * t / 2)
-        y = t * math.sin(t * t / 2)
-        clothoid_points.append((x, y))
-        t += dt
-
+    x=0
+    y=0
+    clothoid_points.append((x,y))
+    while(t<=s_length):
+      x+= dt * 0.5 * (math.cos(t*t/2) + math.cos((t+dt)*(t+dt)/2))
+      y+= dt * 0.5 * (math.sin(t*t/2) + math.sin((t+dt)*(t+dt)/2))
+      clothoid_points.append((x,y))
+      t=t+dt
     return clothoid_points
+    
+    
+    
+   # while t <= s_length:
+    #    x = t * math.cos(t * t / 2)
+   #     y = t * math.sin(t * t / 2)
+   #     clothoid_points.append((x, y))
+  #      t += dt
+  
+
+    #return clothoid_points
 
 def reflect_point_across_normal(point, merging_point,tangent_angle):
     x, y = point
@@ -73,7 +85,8 @@ def Clockwise_Merged_Clothoid(merged_clothoid_points):
 
 
 # Define the length of the clothoid
-s_length = 1
+s_length = 1.2
+
 
 
 
