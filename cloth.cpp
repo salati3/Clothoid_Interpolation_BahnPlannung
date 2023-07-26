@@ -342,7 +342,7 @@ const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_a
         double translate_y = -start_point.y;
 
         // Step 2: Calculate the angle between the turning point and the positive x-axis
-        double theta = atan2(turning_point.y - start_point.y, turning_point.x - start_point.x);
+        double theta = math.atan2(turning_point.y - start_point.y, turning_point.x - start_point.x);
 
         // Step 3: Rotate only the three points (start_point, turning_point, and goal_point) by the negative of that angle to align the turning point with the positive x-axis
         double transformed_start_x = cos(-theta) * (start_point.x + translate_x) - sin(-theta) * (start_point.y + translate_y);
@@ -355,7 +355,7 @@ const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_a
         double transformed_goal_y = sin(-theta) * (goal_point.x + translate_x) + cos(-theta) * (goal_point.y + translate_y);
 
         double d_max = transformed_turning_x;
-        double Phi_C2 = math.atan2(transformed_goal_y, transformed_goal_x) * 0.5;
+        double Phi_C2 = math.atan2(transformed_goal_y-transfomred_turning_y, transformed_goal_x- transformed_turning_x) * 0.5;  //Subtract the transfomed Turn point coordinates, so the correct angle is calculated
         double s_BC = math.sqrt(2 * Phi_C2);
 
 
