@@ -378,8 +378,8 @@ const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_a
         std::vector<std::pair<double, double>> first_clothoid_points = Subset_Basic_Clothoid(Basic_Clothoid,s_final); //first Clothoid with final length
 
         for (auto& point : first_clothoid_points) {
-        point.first *= c_sharpness;
-        point.second *= c_sharpness;
+        point.first /= c_sharpness;
+        point.second /= c_sharpness;
     }
 
         
