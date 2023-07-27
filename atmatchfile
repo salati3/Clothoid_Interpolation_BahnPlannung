@@ -294,121 +294,144 @@ class PathSmoothingNode
 
 
 
-    void Clothoid_Interpolation(const nav_msgs::Path::ConstPtr& global_plan_msg, double s_length, double epsilon,double max_angle)
-    {
+void Clothoid_Interpolation(const nav_msgs::Path::ConstPtr& global_plan_msg, double s_length, double epsilon,double max_angle){
 
 
-        epsilon = 0.1; //The maximum distance between the original path and the simplified path
-        max_angle = 120; //The maximum angle between the two consecutive points of the original path
-        s_length = 5.0; //The length of the clothoid in the lookup table
+epsilon = 0.1; //The maximum distance between the original path and the simplified path
+max_angle = 120; //The maximum angle between the two consecutive points of the original path
+s_lenth = 5.0; //The length of the clothoid in the lookup table
+int n = 5; //The number of points in the final merged symmetric clothoid, in order to push the indidces
+int total_shift = 0;
+int turning_point_index = 0;
+int start_index = 0;
+int goal_index = 0;
+int new_turning_point_index = 0;
+int new_start_index = 0;
+int new_goal_index = 0;
 
 
 
 
+//The lookup table of a basic Clothoid, so that the Fresnal integrals are only solved once here
+std::vector<std::pair<double, double>> Basic_Clothoid = Calculate_Basic_Clothoid(double s_length);
 
 
-
-
-
-        //The lookup table of a basic Clthoid, so that the Fresnal integrals are only solved once here
-        std::vector<std::pair<double, double>> Basic_Clothoid = Calculate_Basic_Clothoid(s_length);
-
-        const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_angle);
+//Ramer-Douglas Algorithmus to simplify the global path and find the turning points
+const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_angle);
 
     
-        const std::vector<Point>& simplified_points = simplified_result.first;
-        const std::vector<int>& turning_point_indices = simplified_result.second;
+    const std::vector<Point>& simplified_points = simplified_result.first;
+    const std::vector<int>& turning_point_indices = simplified_result.second;
 
 
 
 
-        // Iterate through the turning points (excluding the first and last points as they are already present in the global plan)
-        for (size_t i = 1; i < turning_point_indices.size() - 1; ++i)
-        {
-            int turning_point_index = turning_point_indices[i];
-            const Point& turning_point = simplified_points[turning_point_index];
+    // Iterate through the turning points (excluding the first and last points as they are already present in the global plan)
+    for (size_t i = 1; i < turning_point_indices.size() - 1; ++i) {
 
-            int start_index = turning_point_indices[i - 2];
-            const geometry_msgs::Point& start_point = global_plan_msg->poses[start_index].pose.position;
-        
-            // Identify goal_point (one index after the turning_point)
-            int goal_index = turning_point_indices[i + 2];
-            const geometry_msgs::Point& goal_point = global_plan_msg->poses[goal_index].pose.position;
-
-
-            //Transform the points so that Starting point is at Orign and the Turning Point is at the positive xAxis
-            double translate_x = -start_point.x;
-            double translate_y = -start_point.y;
-
-            // Step 2: Calculate the angle between the turning point and the positive x-axis
-            double theta = atan2(turning_point.y - start_point.y, turning_point.x - start_point.x);
-
-            // Step 3: Rotate only the three points (start_point, turning_point, and goal_point) by the negative of that angle to align the turning point with the positive x-axis
-            double transformed_start_x = cos(-theta) * (start_point.x + translate_x) - sin(-theta) * (start_point.y + translate_y);
-            double transformed_start_y = sin(-theta) * (start_point.x + translate_x) + cos(-theta) * (start_point.y + translate_y);
-
-            double transformed_turning_x = cos(-theta) * (turning_point.x + translate_x) - sin(-theta) * (turning_point.y + translate_y);
-            double transformed_turning_y = sin(-theta) * (turning_point.x + translate_x) + cos(-theta) * (turning_point.y + translate_y);
-
-            double transformed_goal_x = cos(-theta) * (goal_point.x + translate_x) - sin(-theta) * (goal_point.y + translate_y);
-            double transformed_goal_y = sin(-theta) * (goal_point.x + translate_x) + cos(-theta) * (goal_point.y + translate_y);
-
-            double d_max = transformed_turning_x;
-            double Phi_C2 = atan2(transformed_goal_y, transformed_goal_x) * 0.5;
-            double s_BC = sqrt(2 * Phi_C2);
-
-
-            //Now take from Basic Clothoid the part with length s_BC
-            std::vector<std::pair<double, double>> subset_basic_clothoid = Subset_Basic_Clothoid(Basic_Clothoid,s_BC);
-
-            //Last point of the subset clothoid
-            double last_x = subset_basic_clothoid.back().first;
-            double last_y = subset_basic_clothoid.back().second;
-
-            double d_BC = last_x + last_y * tan(Phi_C2);
-            double e_BC = last_y / cos(Phi_C2);
-
-            double Scale_Ratio = d_BC/d_max;  //The scale Ratio 
-
-            double s_final = s_BC/Scale_Ratio; //The final length of the clothoid
-
-            double c_sharpness = Scale_Ratio * Scale_Ratio; //The sharpness of the clothoid
-
-            std::vector<std::pair<double, double>> first_clothoid_points = Subset_Basic_Clothoid(Basic_Clothoid,s_final); //first Clothoid with final length
-
-            for (auto& point : first_clothoid_points) 
-            {
-            point.first *= c_sharpness;
-            point.second *= c_sharpness;
-            }
-
-        
-            //Now merge the first clothoid with its symmetric clothoid
-
-            //Is the merged clothoid clockwise or counter-clockwise?
-            double determinant = (start_point.x * turning_point.y + start_point.y * goal_point.x + turning_point.x * goal_point.y) - (goal_point.x * turning_point.y + goal_point.y * start_point.x + turning_point.x * start_point.y);
-            // Determinant of Matrix | x1 y1 1 |
-            //                       | x2 y2 1 |
-            //                       | x3 y3 1 |
-            // Alternatively use this tangent angle  Phi_C2 =   
-            if (determinant>0)
-            {
-                std::vector<std::pair<double, double>> merged_symmetric_clothoid = Merged_symmetric_clothoids(first_clothoid_points);
-            }
-            else
-            {
-                std::vector<std::pair<double, double>> merged_symmetric_clothoid = Clockwise_Merged_Clothoid(Merged_symmetric_clothoids(first_clothoid_points));
-            }
-
-
-            std::vector<std::pair<double, double>> transformed_points = TransformSymmetricClothoid(merged_symmetric_clothoid, start_point);
-            // Erease the points between the start_point and the goal_point
-            global_plan_msg->poses.erase(global_plan_msg->poses.begin() + start_index + 1, global_plan_msg->poses.begin() + goal_index);
-            //Insert the transformed_points at the index of the start_point in the global plan
-            global_plan_msg->poses.insert(global_plan_msg->poses.begin() + start_index + 1, transformed_points.begin(), transformed_points.end());
-
+        if (i==1){
+        turning_point_index = turning_point_indices[i]
+        start_index = turning_point_index - 2;
+        goal_index = turning_point_index + 2;
+        }
+        else{
+        start_index = turning_point_indices[i-2] + total_shift;
+        goal_index = start_index + 4;
+        turning_point_index = start_index +2; 
         }
 
+
+
+
+        const Point& turning_point = global_plan_msg->poses[turning_point_index].pose.position;
+        const Point& start_point = global_plan_msg->poses[start_index].pose.position;
+        const Point& goal_point = global_plan_msg->poses[goal_index].pose.position;
+
+
+        //Transform the points so that Starting point is at Orign and the Turning Point is at the positive xAxis
+        double translate_x = -start_point.x;
+        double translate_y = -start_point.y;
+
+        // Step 2: Calculate the angle between the turning point and the positive x-axis
+        double theta = math.atan2(turning_point.y - start_point.y, turning_point.x - start_point.x);
+
+        // Step 3: Rotate only the three points (start_point, turning_point, and goal_point) by the negative of that angle to align the turning point with the positive x-axis
+        double transformed_start_x = cos(-theta) * (start_point.x + translate_x) - sin(-theta) * (start_point.y + translate_y);
+        double transformed_start_y = sin(-theta) * (start_point.x + translate_x) + cos(-theta) * (start_point.y + translate_y);
+
+        double transformed_turning_x = cos(-theta) * (turning_point.x + translate_x) - sin(-theta) * (turning_point.y + translate_y);
+        double transformed_turning_y = sin(-theta) * (turning_point.x + translate_x) + cos(-theta) * (turning_point.y + translate_y);
+
+        double transformed_goal_x = cos(-theta) * (goal_point.x + translate_x) - sin(-theta) * (goal_point.y + translate_y);
+        double transformed_goal_y = sin(-theta) * (goal_point.x + translate_x) + cos(-theta) * (goal_point.y + translate_y);
+
+        double d_max = transformed_turning_x;
+        double Phi_C2 = math.atan2(transformed_goal_y-transfomred_turning_y, transformed_goal_x- transformed_turning_x) * 0.5;  //Subtract the transfomed Turn point coordinates, so the correct angle is calculated
+        double s_BC = math.sqrt(2 * Phi_C2);
+
+
+        //Now take from Basic Clothoid the part with length s_BC
+        std::vector<std::pair<double, double>> subset_basic_clothoid = Subset_Basic_Clothoid(Basic_Clothoid,s_BC);
+
+        //Last point of the subset clothoid
+        double last_x = subset_basic_clothoid.back().first;
+        double last_y = subset_basic_clothoid.back().second;
+
+        d_BC = last_x + last_y * tan(Phi_C2);
+        e_BC = last_y / cos(Phi_C2);
+
+        double Scale_Ratio = d_BC/d_max;  //The scale Ratio 
+
+        double s_final = s_BC/Scale_Ratio; //The final length of the clothoid
+
+        double c_sharpness = Scale_Ratio * Scale_Ratio; //The sharpness of the clothoid
+
+        std::vector<std::pair<double, double>> first_clothoid_points = Subset_Basic_Clothoid(Basic_Clothoid,s_final); //first Clothoid with final length
+
+        for (auto& point : first_clothoid_points) {
+        point.first /= Scale_Ratio;
+        point.second /= Scale_Ratio;
+    }
+
+        
+        //Now merge the first clothoid with its symmetric clothoid
+
+        //Is the merged clothoid clockwise or counter-clockwise?
+        double determinant = (start_point.x * turning_point.y + start_point.y * goal_point.x + turning_point.x * goal_point.y) - (goal_point.x * turning_point.y + goal_point.y * start_point.x + turning_point.x * start_point.y);
+        // Determinant of Matrix | x1 y1 1 |
+        //                       | x2 y2 1 |
+         //                      | x3 y3 1 |
+
+         if determinant>0 {
+            std::vector<std::pair<double, double>> merged_symmetric_clothoid = Merged_symmetric_clothoids(first_clothoid_points);
+         }
+         else {
+            std::vector<std::pair<double, double>> merged_symmetric_clothoid = Clockwise_Merged_Clothoid(Merged_symmetric_clothoids(first_clothoid_points));
+         }
+
+
+        std::vector<std::pair<double, double>> transformed_points = TransformSymmetricClothoid(merged_symmetric_clothoid, start_point);
+        n = transfomed_clothoids.length();
+        total_shift += n-1-4;
+        // Erease the points between the start_point and the goal_point
+        global_plan_msg->poses.erase(global_plan_msg->poses.begin() + start_index + 1, global_plan_msg->poses.begin() + goal_index);
+        //Insert the transformed_points at the index of the start_point in the global plan
+        global_plan_msg->poses.insert(global_plan_msg->poses.begin() + start_index + 1, transformed_points.begin(), transformed_points.end());
+        
+  
+  
+        new_turning_point_index = ;
+        new_start_index = turning_point_index + total_shift;
+        new_goal_index = turning_point;
+
+
+
+
+
+        
+
+
+}
 
 
 
