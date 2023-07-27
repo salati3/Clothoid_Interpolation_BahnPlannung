@@ -303,18 +303,23 @@ void Clothoid_Interpolation(const nav_msgs::Path::ConstPtr& global_plan_msg, dou
 epsilon = 0.1; //The maximum distance between the original path and the simplified path
 max_angle = 120; //The maximum angle between the two consecutive points of the original path
 s_lenth = 5.0; //The length of the clothoid in the lookup table
+int n = 5; //The number of points in the final merged symmetric clothoid, in order to push the indidces
+int total_shift = 0;
+int turning_point_index = 0;
+int start_index = 0;
+int goal_index = 0;
+int new_turning_point_index = 0;
+int new_start_index = 0;
+int new_goal_index = 0;
 
 
 
 
-
-
-
-
-
-//The lookup table of a basic Clthoid, so that the Fresnal integrals are only solved once here
+//The lookup table of a basic Clothoid, so that the Fresnal integrals are only solved once here
 std::vector<std::pair<double, double>> Basic_Clothoid = Calculate_Basic_Clothoid(double s_length);
 
+
+//Ramer-Douglas Algorithmus to simplify the global path and find the turning points
 const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_angle);
 
     
@@ -326,14 +331,23 @@ const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_a
 
     // Iterate through the turning points (excluding the first and last points as they are already present in the global plan)
     for (size_t i = 1; i < turning_point_indices.size() - 1; ++i) {
-        int turning_point_index = turning_point_indices[i];
-        const Point& turning_point = simplified_points[turning_point_index];
 
-        int start_index = turning_point_indices[i - 2];
+        if (i==1){
+        turning_point_index = turning_point_indices[i]
+        start_index = turning_point_index - 2;
+        goal_index = turning_point_index + 2;
+        }
+        else{
+        start_index = turning_point_indices[i-2] + total_shift;
+        goal_index = start_index + 4;
+        turning_point_index = start_index +2; 
+        }
+
+
+
+
+        const Point& turning_point = global_plan_msg->poses[turning_point_index].pose.position;
         const Point& start_point = global_plan_msg->poses[start_index].pose.position;
-        
-        // Identify goal_point (one index after the turning_point)
-        int goal_index = turning_point_indices[i + 2];
         const Point& goal_point = global_plan_msg->poses[goal_index].pose.position;
 
 
@@ -400,11 +414,18 @@ const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_a
 
 
         std::vector<std::pair<double, double>> transformed_points = TransformSymmetricClothoid(merged_symmetric_clothoid, start_point);
+        n = transfomed_clothoids.length();
+        total_shift += n-1-4;
         // Erease the points between the start_point and the goal_point
         global_plan_msg->poses.erase(global_plan_msg->poses.begin() + start_index + 1, global_plan_msg->poses.begin() + goal_index);
         //Insert the transformed_points at the index of the start_point in the global plan
         global_plan_msg->poses.insert(global_plan_msg->poses.begin() + start_index + 1, transformed_points.begin(), transformed_points.end());
-
+        
+  
+  
+        new_turning_point_index = ;
+        new_start_index = turning_point_index + total_shift;
+        new_goal_index = turning_point;
 
 
 
@@ -413,67 +434,6 @@ const auto& simplified_result = rdp_with_indices(global_plan_msg, epsilon, max_a
         
 
 
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Function that given the length of the Basic Clothoid, gives out a few paramters that will be used later to scale the clothoid
-std::tuple<double, double, double, double, double, double> parameterBasicClothoid(double s_length) {
-    
-    double Phi_C2 = s_length * s_length / 2;
-    
-    
-    std::vector<std::pair<double, double>> x_and_y_BCt = calculateBasicClothoid(s_length);
-    
-    std::pair<double, double> x_and_y_BCt_lastPair = x_and_y_BCt.back();
-    double x_BCt = x_and_y_BCt_lastPair.first;
-    double y_BCt = x_and_y_BCt_lastPair.second;
-    
-    
-    double d_BC = x_BCt + y_BCt * tan(Phi_C2);
-    double e_BC = y_BCt/cos(Phi_C2);
-    double x_TP = d_BC;
-    double y_TP = 0.0;
-
-    
-
-    // Return the six variables as a tuple
-    return std::make_tuple(x_BCt, y_BCt, d_BC, e_BC, x_TP, y_TP);
 }
 
 
